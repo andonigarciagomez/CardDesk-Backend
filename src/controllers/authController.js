@@ -1,64 +1,74 @@
-import pool from "../config/db.js";
+import User from "../models/user.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-// REGISTER
+// 🔥 REGISTER
 export const register = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Encriptar contraseña
+    if (!email || !password) {
+      return res.status(400).json({ message: "Campos obligatorios" });
+    }
+
+    const existingUser = await User.findOne({ email });
+
+    if (existingUser) {
+      return res.status(400).json({ message: "Usuario ya existe" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const result = await pool.query(
-      "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email",
-      [email, hashedPassword]
-    );
+    const newUser = new User({
+      email,
+      password: hashedPassword,
+    });
 
-    res.status(201).json(result.rows[0]);
+    await newUser.save();
+
+    res.status(201).json({ message: "Usuario creado correctamente" });
+
   } catch (error) {
-    console.error("ERROR REGISTRO:", error.message);
-    res.status(500).json({ error: "Error en registro" });
+    console.error(error);
+    res.status(500).json({ message: "Error en el registro" });
   }
 };
 
-// LOGIN
+// 🔥 LOGIN
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const result = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
-
-    const user = result.rows[0];
+    const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ error: "Usuario no encontrado" });
+      return res.status(400).json({ message: "Usuario no encontrado" });
     }
 
-    const validPassword = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password);
 
-    if (!validPassword) {
-      return res.status(401).json({ error: "Contraseña incorrecta" });
+    if (!isMatch) {
+      return res.status(400).json({ message: "Contraseña incorrecta" });
     }
 
+    // 🔐 GENERAR TOKEN
     const token = jwt.sign(
-      { id: user.id },
-      "secretkey", // luego lo movemos a .env
-      { expiresIn: "1d" }
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
     );
 
-    res.json({
+    res.status(200).json({
+      message: "Login correcto",
       token,
       user: {
-        id: user.id,
+        id: user._id,
         email: user.email,
       },
     });
+
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Error en login" });
+    res.status(500).json({ message: "Error en el login" });
   }
 };

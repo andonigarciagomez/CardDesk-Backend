@@ -1,12 +1,11 @@
-import pkg from "pg";
-const { Pool } = pkg;
+import mongoose from "mongoose";
 
-const pool = new Pool({
-  user: "prueba",
-  host: "localhost",
-  database: "carddesk",
-  password: "1234", // 👈 tu contraseña real
-  port: 5433,
-});
-
-export default pool;
+export const connectDB = async () => {
+  try {
+    await mongoose.connect("mongodb://127.0.0.1:27017/carddesk");
+    console.log("✅ MongoDB conectado");
+  } catch (error) {
+    console.error("❌ Error conectando DB:", error.message);
+    process.exit(1);
+  }
+};
